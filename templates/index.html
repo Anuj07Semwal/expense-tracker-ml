@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sentiment Analyzer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f5f5f5;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 2.5rem;
+      max-width: 640px;
+      width: 100%;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+
+    .header { margin-bottom: 2rem; }
+    .header h1 { font-size: 1.6rem; font-weight: 700; color: #111; }
+    .header p  { color: #666; margin-top: 0.4rem; font-size: 0.95rem; }
+
+    label { font-size: 0.85rem; font-weight: 600; color: #444; display: block; margin-bottom: 0.5rem; }
+
+    textarea {
+      width: 100%;
+      padding: 0.85rem 1rem;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.2s;
+      font-family: inherit;
+      color: #111;
+    }
+    textarea:focus { border-color: #5C6BC0; }
+
+    .btn {
+      margin-top: 1rem;
+      width: 100%;
+      padding: 0.85rem;
+      background: #5C6BC0;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .btn:hover  { background: #3F51B5; }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { background: #aaa; cursor: not-allowed; }
+
+    .result { margin-top: 1.75rem; display: none; }
+
+    .result-label {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+    .emoji { font-size: 2.2rem; }
+    .label-text { font-size: 1.4rem; font-weight: 700; }
+    .label-text.positive { color: #2E7D32; }
+    .label-text.negative { color: #C62828; }
+
+    .confidence {
+      font-size: 0.85rem;
+      color: #666;
+      margin-top: 2px;
+    }
+
+    .bar-group { margin-bottom: 0.75rem; }
+    .bar-label  {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.83rem;
+      font-weight: 500;
+      color: #444;
+      margin-bottom: 4px;
+      text-transform: capitalize;
+    }
+    .bar-track {
+      height: 8px;
+      background: #f0f0f0;
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 99px;
+      transition: width 0.6s ease;
+    }
+    .bar-fill.positive { background: #43A047; }
+    .bar-fill.negative { background: #E53935; }
+
+    .error-msg {
+      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      background: #FFEBEE;
+      color: #B71C1C;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      display: none;
+    }
+
+    .examples {
+      margin-top: 1.5rem;
+      border-top: 1px solid #f0f0f0;
+      padding-top: 1.25rem;
+    }
+    .examples p { font-size: 0.8rem; font-weight: 600; color: #aaa; margin-bottom: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .example-chip {
+      display: inline-block;
+      margin: 0.25rem;
+      padding: 0.4rem 0.8rem;
+      background: #f5f5f5;
+      border: 1px solid #e8e8e8;
+      border-radius: 99px;
+      font-size: 0.82rem;
+      color: #333;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .example-chip:hover { background: #EEEEEE; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <h1>🎯 Sentiment Analyzer</h1>
+      <p>ML-powered text sentiment classification &mdash; positive or negative.</p>
+    </div>
+
+    <label for="textInput">Enter text to analyze</label>
+    <textarea id="textInput" rows="5" placeholder="e.g. The product quality was absolutely outstanding and exceeded all my expectations."></textarea>
+
+    <button class="btn" id="analyzeBtn" onclick="analyze()">Analyze Sentiment</button>
+
+    <div class="error-msg" id="errorMsg"></div>
+
+    <div class="result" id="result">
+      <div class="result-label">
+        <span class="emoji" id="emoji"></span>
+        <div>
+          <div class="label-text" id="labelText"></div>
+          <div class="confidence" id="confText"></div>
+        </div>
+      </div>
+
+      <div id="bars"></div>
+    </div>
+
+    <div class="examples">
+      <p>Try an example</p>
+      <span class="example-chip" onclick="setExample(this)">This product is absolutely amazing!</span>
+      <span class="example-chip" onclick="setExample(this)">Worst purchase I have ever made.</span>
+      <span class="example-chip" onclick="setExample(this)">Delivery was fast and packaging was great.</span>
+      <span class="example-chip" onclick="setExample(this)">Completely disappointed with the quality.</span>
+    </div>
+  </div>
+
+  <script>
+    function setExample(el) {
+      document.getElementById("textInput").value = el.innerText;
+    }
+
+    async function analyze() {
+      const text = document.getElementById("textInput").value.trim();
+      const btn  = document.getElementById("analyzeBtn");
+      const resultEl = document.getElementById("result");
+      const errorEl  = document.getElementById("errorMsg");
+
+      errorEl.style.display  = "none";
+      resultEl.style.display = "none";
+
+      if (!text) {
+        errorEl.textContent    = "Please enter some text first.";
+        errorEl.style.display  = "block";
+        return;
+      }
+
+      btn.disabled    = true;
+      btn.textContent = "Analyzing...";
+
+      try {
+        const res  = await fetch("/predict", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text })
+        });
+        const data = await res.json();
+
+        if (data.error) {
+          errorEl.textContent   = data.error;
+          errorEl.style.display = "block";
+          return;
+        }
+
+        const label = data.label;
+        document.getElementById("emoji").textContent     = label === "pos" ? "😊" : "😞";
+        const labelEl = document.getElementById("labelText");
+        labelEl.textContent = label === "pos" ? "Positive" : "Negative";
+        labelEl.className   = "label-text " + (label === "pos" ? "positive" : "negative");
+        document.getElementById("confText").textContent  = `Confidence: ${data.confidence}%`;
+
+        const barsEl = document.getElementById("bars");
+        barsEl.innerHTML = "";
+        const labelMap = { pos: "Positive", neg: "Negative" };
+        const colorMap = { pos: "positive", neg: "negative" };
+
+        for (const [cls, score] of Object.entries(data.scores)) {
+          barsEl.innerHTML += `
+            <div class="bar-group">
+              <div class="bar-label">
+                <span>${labelMap[cls] || cls}</span>
+                <span>${score}%</span>
+              </div>
+              <div class="bar-track">
+                <div class="bar-fill ${colorMap[cls] || ''}" style="width: ${score}%"></div>
+              </div>
+            </div>`;
+        }
+
+        resultEl.style.display = "block";
+
+      } catch (err) {
+        errorEl.textContent   = "Network error. Is the Flask server running?";
+        errorEl.style.display = "block";
+      } finally {
+        btn.disabled    = false;
+        btn.textContent = "Analyze Sentiment";
+      }
+    }
+
+    document.getElementById("textInput").addEventListener("keydown", e => {
+      if (e.key === "Enter" && e.ctrlKey) analyze();
+    });
+  </script>
+</body>
+</html>
